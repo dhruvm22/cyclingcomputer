@@ -1448,8 +1448,8 @@ void readingTask(void *pv)                                                      
       }
 
 
-      rideData.odo += rideData.gps_speed * ((now-timeold)/1000.0) * 0.001;      
-      if(rideData.ride == 1 && rideData.rpause == 0) rideData.distance += rideData.gps_speed * ((now-timeold)/1000.0) * 0.001; 
+      rideData.odo += rideData.speed*(5.0/18.0) * ((now-timeold)/1000.0) * 0.001;      
+      if(rideData.ride == 1 && rideData.rpause == 0) rideData.distance += rideData.speed*(5.0/18.0) * ((now-timeold)/1000.0) * 0.001; 
 
 
       if(rideData.ride == 1 && rideData.rpause == 0 && autoPause == 0) rideData.time_r += (now-timeold)/1000.0;
