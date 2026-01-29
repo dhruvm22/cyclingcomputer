@@ -50,6 +50,7 @@ struct RideData {
   double max_speed;
   double at_max_speed;
   double speed;
+  double gps_speed;
   double battery_percentage;
   double battery_voltage;
   int    indicator;     // -1 left, 0 off, 1 right
@@ -1149,7 +1150,7 @@ void gpxLoggingTask(void* pvParameters)
         if (rideData.ride == 0) break; // you should update this flag elsewhere
 
         // Acquire SD mutex to log data
-        if (xSemaphoreTake(sdMutex, portMAX_DELAY) && rideData.isGPS)
+        if (xSemaphoreTake(sdMutex, portMAX_DELAY) && rideData.isGPS && rideData.speed > 0)
         {
             timeNew = rideData.utf_time;
             if(timeOld != timeNew)
@@ -1371,61 +1372,95 @@ void readingTask(void *pv)                                                      
 
   while (1) {
 
-    int tyrePass = digitalRead(14);
 
-    now = millis();  
+    // if(rideData.isGPS == 0)
+    // {
+    //   int tyrePass = digitalRead(14);
 
-    if (tyrePass == LOW && mFlag == 0) {
-      if(now - timeold > 100)
+    //   now = millis();  
+
+    //   if (tyrePass == LOW && mFlag == 0) {
+    //     if(now - timeold > 100)
+    //     {
+    //       double newSpeed = (tyreCircumference / ((now - timeold)/1e3)) * 3.6;
+
+    //       if(newSpeed < rideData.speed || newSpeed - rideData.speed < 30)
+    //       {
+    //         rideData.speed = newSpeed;
+
+    //         rideData.at_max_speed = max(rideData.speed, rideData.at_max_speed);
+    //         if(autoPause == 1)
+    //         {
+    //           autoPause = 0;
+    //         } 
+
+    //       }
+    //       // rideData.speed = (tyreCircumference / ((now - timeold)/1e3)) * 3.6;
+    //       rideData.odo += tyreCircumference / 1000.0;      
+    //       if(rideData.ride == 1 && rideData.rpause == 0) rideData.distance += tyreCircumference / 1000.0; 
+    //       timeold = now;
+    //       mFlag = 1;
+    //     }
+    //   }
+
+    //   if (tyrePass == HIGH)
+    //     mFlag = 0;
+
+    //   if ((now - timeold) > 5000) {
+    //     rideData.speed = 0;
+
+    //     if(rideData.ride == 1 && autoPause == 0)
+    //     {
+    //       autoPause = 1;
+    //     }
+    //   }
+
+    //   if(rideData.ride == 1 && rideData.rpause == 0 && autoPause == 0) rideData.time_r += 0.01*0.2;
+      
+    //   if (rideData.ride == 1 && rideData.time_r > 0 && rideData.rpause == 0 && autoPause ==  0) 
+    //   {
+    //     rideData.max_speed = max(rideData.speed, rideData.max_speed);
+    //     rideData.rhour = rideData.time_r / 3600;
+    //     rideData.rmin = ((int)rideData.time_r % 3600) / 60;
+    //     rideData.avg_speed = (rideData.time_r > 0) ? (rideData.distance / (rideData.time_r / 3600.0)) : rideData.avg_speed;
+    //   }
+    // }
+
+
+
+    timeold = now;
+    now = millis();
+
+    if(rideData.isGPS)
+    {
+      rideData.speed = rideData.gps_speed * (18.0/5.0);          //speed in kmph
+      if(rideData.speed < 2) rideData.speed = 0;
+
+      rideData.at_max_speed = max(rideData.speed, rideData.at_max_speed);
+
+      if(rideData.speed > 4 && autoPause == 1)
       {
-        double newSpeed = (tyreCircumference / ((now - timeold)/1e3)) * 3.6;
-
-        if(newSpeed < rideData.speed || newSpeed - rideData.speed < 30)
-        {
-          rideData.speed = newSpeed;
-
-          rideData.at_max_speed = max(rideData.speed, rideData.at_max_speed);
-          if(autoPause == 1)
-          {
-            autoPause = 0;
-          } 
-
-        }
-        // rideData.speed = (tyreCircumference / ((now - timeold)/1e3)) * 3.6;
-        rideData.odo += tyreCircumference / 1000.0;      
-        if(rideData.ride == 1 && rideData.rpause == 0) rideData.distance += tyreCircumference / 1000.0; 
-        timeold = now;
-        mFlag = 1;
+        autoPause = 0;
       }
-    }
-
-    if (tyrePass == HIGH)
-      mFlag = 0;
-
-    if ((now - timeold) > 5000) {
-      rideData.speed = 0;
-
-      if(rideData.ride == 1 && autoPause == 0)
+      if(rideData.speed < 2 && rideData.ride == 1 && autoPause == 0)
       {
         autoPause = 1;
       }
 
-    }
+
+      rideData.odo += rideData.gps_speed * ((now-timeold)/1000.0) * 0.001;      
+      if(rideData.ride == 1 && rideData.rpause == 0) rideData.distance += rideData.gps_speed * ((now-timeold)/1000.0) * 0.001; 
 
 
+      if(rideData.ride == 1 && rideData.rpause == 0 && autoPause == 0) rideData.time_r += (now-timeold)/1000.0;
 
-
-    if(rideData.ride == 1 && rideData.rpause == 0 && autoPause == 0) rideData.time_r += 0.01*0.2;
-
-
-    
-
-    if (rideData.ride == 1 && rideData.time_r > 0 && rideData.rpause == 0 && autoPause ==  0) 
-    {
-      rideData.max_speed = max(rideData.speed, rideData.max_speed);
-      rideData.rhour = rideData.time_r / 3600;
-      rideData.rmin = ((int)rideData.time_r % 3600) / 60;
-      rideData.avg_speed = (rideData.time_r > 0) ? (rideData.distance / (rideData.time_r / 3600.0)) : rideData.avg_speed;
+      if (rideData.ride == 1 && rideData.time_r > 0 && rideData.rpause == 0 && autoPause ==  0) 
+      {
+        rideData.max_speed = max(rideData.speed, rideData.max_speed);
+        rideData.rhour = rideData.time_r / 3600;
+        rideData.rmin = ((int)rideData.time_r % 3600) / 60;
+        rideData.avg_speed = (rideData.time_r > 0) ? (rideData.distance / (rideData.time_r / 3600.0)) : rideData.avg_speed;
+      }
     }
 
     
@@ -1482,11 +1517,17 @@ void readingTask(void *pv)                                                      
         double lng = gps.location.lng();
 
 
+
         if(lat < 30 && lat > 10 && lng < 90 && lng > 70)
         {
           rideData.lattitude = lat;
           rideData.longitude = lng;
         }
+      }
+
+      if(gps.speed.isUpdated() && gps.speed.isValid())
+      {
+        rideData.gps_speed = gps.speed.mps(); 
       }
 
       if(rideData.lattitude != 0 && rideData.utf_time != "")
@@ -1514,17 +1555,19 @@ void readingTask(void *pv)                                                      
 
 
 
-      else if(gps.location.age() < 4000)
+      else if(gps.location.age() > 4000)
       {
         rideData.isGPS = 0;
       }
 
-      // Serial.println(rideData.lattitude);
-      // Serial.println(rideData.longitude);
-      // Serial.println(rideData.utf_time);
-      // Serial.println(rideData.isGPS);
 
     }
+
+
+
+
+  
+
 
 
 
@@ -1540,6 +1583,7 @@ void readingTask(void *pv)                                                      
 
     // Serial.println(rideData.battery_percentage);
 
+    
     vTaskDelay(2 / portTICK_PERIOD_MS);                                             //wait to see if two buttons are pressed
 
   }
